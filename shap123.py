@@ -1,4 +1,3 @@
-
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications import ResNet50
 from tensorflow.keras.models import load_model
@@ -7,10 +6,9 @@ import tensorflow as tf
 import shap
 import numpy as np
 import matplotlib.pyplot as plt
-from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 
-# 加载数据
+# Load data
 data_path = "C:\\Users\DELL\Desktop\code\dataset\covid-xray\Data\\train"
 train_data_path = data_path
 datagen = ImageDataGenerator(rescale=1 / 255,
@@ -31,64 +29,64 @@ train_generator = datagen.flow_from_directory(
     class_mode='categorical'
 )
 
-# 加载模型
+# Load model
 loaded_model = load_model("C:\\Users\DELL\Desktop\XAI code\\New common COVID ResNet101.h5")
 
-# 设置要分析的图像文件夹路径
+# Set the path of the folder containing images to analyze
 data_folder = "C:\\Users\DELL\Desktop\code\dataset\choose\COVID"
 
 
-# 加载图像并进行预处理
+# Load and preprocess image
 def load_and_preprocess_image(img_path):
     img = load_img(img_path, target_size=(224, 224))
     img_array = img_to_array(img) / 255.0
     return np.expand_dims(img_array, axis=0)
 
-# 计算Fidelity Score
+# Calculate Fidelity Score
 def calculate_fidelity_score(original_confidence, adversarial_confidence):
-    # 这里的Fidelity Score可以定义为原始置信度和对抗性置信度之间的相对差异
+    # The Fidelity Score can be defined as the relative difference between the original and adversarial confidences
     fidelity_score = adversarial_confidence / original_confidence
     return fidelity_score
 
-# 遍历文件夹中的所有图像文件
+# Iterate over all image files in the folder
 fidelity_scores = []
 for filename in os.listdir(data_folder):
     img_path = os.path.join(data_folder, filename)
     if os.path.isfile(img_path) and img_path.lower().endswith(('.png', '.jpg', '.jpeg')):
         img_array = load_and_preprocess_image(img_path)
 
-        # 使用背景数据创建一个Deep SHAP解释器
-        background = train_generator.next()[0]  # 使用一些训练数据作为背景。如果需要，可以使用多个批次
+        # Create a Deep SHAP explainer using background data
+        background = train_generator.next()[0]  # Use some training data as background. You can use multiple batches if needed.
         explainer = shap.GradientExplainer(loaded_model, background)
 
-        # 计算SHAP值
+        # Compute SHAP values
         shap_values = explainer.shap_values(img_array)
         print(f"SHAP values for {filename}:", shap_values)
 
-        # 可视化SHAP值并保存结果
+        # Visualize SHAP values and save the result
         shap.image_plot(shap_values, img_array, show=False)
         plt.savefig(os.path.join(data_folder, f"shap_{filename}.png"))
-        plt.clf()  # 清除当前图像，以便绘制下一张图像
+        plt.clf()  # Clear the current figure to plot the next image
 
-        # 使用模型预测图像
+        # Predict the image using the model
         preds = loaded_model.predict(img_array)
 
-        # 查找具有最大概率的类索引
+        # Find the class index with the highest probability
         predicted_class_index = np.argmax(preds[0])
-        class_labels = ['1', '2', '3','4']
+        class_labels = ['1', '2', '3', '4']
         print(f"Predicted for {filename}:", class_labels[predicted_class_index])
 
-        # 原始置信度
+        # Original confidence
         original_confidence = np.max(preds[0])
 
-        # 对抗性置信度（限制范围在0到原始置信度之间）
+        # Adversarial confidence (restricted to the range between 0 and the original confidence)
         adversarial_confidence = original_confidence * np.random.uniform(0.7, 1.0)
 
-        # 计算并存储Fidelity Score
+        # Calculate and store the Fidelity Score
         fidelity_score = calculate_fidelity_score(original_confidence, adversarial_confidence)
         fidelity_scores.append(fidelity_score)
         print(f"Fidelity Score for {filename}: {fidelity_score}")
 
-# 输出平均Fidelity Score
+# Output the average Fidelity Score
 average_fidelity_score = np.mean(fidelity_scores)
 print(f"Average Fidelity Score: {average_fidelity_score}")

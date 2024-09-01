@@ -7,14 +7,14 @@ from tensorflow.keras.applications.densenet import preprocess_input
 import matplotlib.pyplot as plt
 from scipy.stats import ttest_ind, f_oneway
 
-# 加载模型
+# Load the model
 model_path = "C:\\Users\DELL\Desktop\XAI code\eyes Densenet121.h5"
 model = load_model(model_path)
 
-# 类别标签
-class_labels = ['1', '2', '3',"4"]
+# Class labels
+class_labels = ['1', '2', '3', '4']
 
-# 对抗生成攻击函数
+# PGD attack function
 def pgd_attack(model, input_image, target_label, epsilon=0.1, epsilon_step=0.01, num_steps=10):
     perturbed_image = input_image
     target_label = int(target_label)
@@ -35,13 +35,13 @@ def pgd_attack(model, input_image, target_label, epsilon=0.1, epsilon_step=0.01,
 
     return perturbed_image
 
-# 反向预处理函数
+# Reverse preprocess input function
 def reverse_preprocess_input(img_array):
     img_array += 1
     img_array *= 127.5
     return np.clip(img_array, 0, 255).astype('uint8')
 
-# 生成对抗性样本函数
+# Generate adversarial example function
 def generate_adversarial_example(model, input_image_path, target_label, epsilon=0.1, epsilon_step=0.01, num_steps=10):
     img = image.load_img(input_image_path, target_size=(224, 224))
     img_array = image.img_to_array(img)
@@ -51,14 +51,14 @@ def generate_adversarial_example(model, input_image_path, target_label, epsilon=
     adversarial_image = pgd_attack(model, input_image, target_label, epsilon, epsilon_step, num_steps)
     return img_array, adversarial_image
 
-# 处理预测结果函数
+# Process predictions function
 def process_predictions(predictions, class_labels):
     predicted_class_indices = np.argmax(predictions, axis=-1)
     predicted_labels = [class_labels[i] for i in predicted_class_indices]
     predicted_probabilities = np.max(predictions, axis=-1)
     return predicted_labels, predicted_probabilities
 
-# 比较原始图像和对抗性图像函数
+# Compare original and adversarial images function
 def compare_original_and_adversarial(model, original_image, adversarial_image):
     original_image_rev = reverse_preprocess_input(original_image)
     adversarial_image_rev = reverse_preprocess_input(adversarial_image.numpy())
@@ -82,20 +82,20 @@ def compare_original_and_adversarial(model, original_image, adversarial_image):
 
     return original_confidence[0], adversarial_confidence[0]
 
-# 获取文件夹中的所有图片路径
+# Get all image paths in a folder function
 def get_image_paths(folder_path):
     image_extensions = ['.jpg', '.jpeg', '.png', '.bmp']
     image_paths = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if os.path.splitext(f)[1].lower() in image_extensions]
     return image_paths
 
-folder_path = "C:\\Users\DELL\Desktop\code\dataset\choose\eyes"# 更新为你的实际文件夹路径
+folder_path = "C:\\Users\DELL\Desktop\code\dataset\choose\eyes" # Update with your actual folder path
 input_image_paths = get_image_paths(folder_path)
 
-# 初始化列表以存储置信度
+# Initialize lists to store confidences
 original_confidences = []
 adversarial_confidences = []
 
-# 生成对抗性样本并比较
+# Generate adversarial samples and compare
 for image_path in input_image_paths:
     original_image, adversarial_image = generate_adversarial_example(model, image_path, target_label=3, epsilon=0.1, epsilon_step=0.01, num_steps=10)
     original_confidence, adversarial_confidence = compare_original_and_adversarial(model, original_image, adversarial_image)
@@ -103,7 +103,7 @@ for image_path in input_image_paths:
     adversarial_confidences.append(adversarial_confidence)
     print(f"Image: {image_path}, Original Confidence: {original_confidence}, Adversarial Confidence: {adversarial_confidence}")
 
-# 检查是否有 NaN 或 Inf 值
+# Check if there are any NaN or Inf values
 def check_data(data):
     if np.any(np.isnan(data)):
         print("Data contains NaN values.")
@@ -117,7 +117,7 @@ check_data(original_confidences)
 print("Checking adversarial_confidences:")
 check_data(adversarial_confidences)
 
-# 进行 t-test
+# Perform t-test
 if len(original_confidences) > 1 and len(adversarial_confidences) > 1:
     t_stat, p_value = ttest_ind(original_confidences, adversarial_confidences)
     print(f"t-statistic: {t_stat}, p-value: {p_value}")
@@ -128,7 +128,7 @@ if len(original_confidences) > 1 and len(adversarial_confidences) > 1:
 else:
     print("Not enough data to perform t-test.")
 
-# 进行 ANOVA
+# Perform ANOVA
 if len(original_confidences) > 1 and len(adversarial_confidences) > 1:
     f_stat, p_value_anova = f_oneway(original_confidences, adversarial_confidences)
     print(f"ANOVA f-statistic: {f_stat}, p-value: {p_value_anova}")
@@ -138,4 +138,3 @@ if len(original_confidences) > 1 and len(adversarial_confidences) > 1:
         print("There is no significant difference between the original and adversarial accuracies according to ANOVA.")
 else:
     print("Not enough data to perform ANOVA.")
-
